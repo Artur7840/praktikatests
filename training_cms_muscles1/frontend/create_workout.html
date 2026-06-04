@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Создать тренировку</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="index.html">Упражнения</a>
+            <a href="favorites.html">Избранное</a>
+            <a href="my_workouts.html">Тренировки</a>
+            <a href="create_workout.html">+ Новая</a>
+            <span id="authButton"></span>
+        </nav>
+    </header>
+    <main>
+        <form id="workoutForm">
+            <h2>Новая тренировка</h2>
+            <input type="text" id="workoutName" placeholder="Название тренировки" required>
+            <div id="exercisesList">
+                <h3>Добавленные упражнения</h3>
+                <div id="selectedExercises"></div>
+            </div>
+            <div id="allExercises">
+                <h3>Выберите упражнение</h3>
+                <select id="exerciseSelect"></select>
+                <input type="number" id="sets" placeholder="Подходы" value="3">
+                <input type="number" id="reps" placeholder="Повторения" value="10">
+                <input type="number" id="weight" placeholder="Вес (кг)" step="0.5" value="0">
+                <button type="button" id="addExerciseBtn">Добавить упражнение</button>
+            </div>
+            <button type="submit">Сохранить тренировку</button>
+        </form>
+    </main>
+    <script src="app.js"></script>
+    <script>
+        if (!getToken()) {
+            alert('Для создания тренировки необходимо войти.');
+            window.location.href = 'login.html';
+        }
+
+        let selected = [];
+        let exercisesList = [];
+
+        async function loadExercises() {
+            const exercises = await fetchJson('/api/exercises');
+            exercisesList = exercises;
+            const select = document.getElementById('exerciseSelect');
+            select.innerHTML = exercises.map(ex => `<option value="${ex.id}">${escapeHtml(ex.name)}</option>`).join('');
+            const pending = localStorage.getItem('pendingExerciseId');
+            if (pending) {
+                const ex = exercises.find(e => e.id == pending);
+                if (ex) addExercise(ex.id, ex.name);
+                localStorage.removeItem('pendingExerciseId');
+            }
+        }
+
+        function addExercise(id, name) {
+            const sets = parseInt(document.getElementById('sets').value);
+            const reps = parseInt(document.getElementById('reps').value);
+            const weight = parseFloat(document.getElementById('weight').value) || 0;
+            selected.push({ exercise_id: id, sets: sets, reps: reps, weight: weight });
+            renderSelected();
+        }
+
+        function renderSelected() {
+            const container = document.getElementById('selectedExercises');
+            container.innerHTML = selected.map((ex, idx) => {
+                const exName = exercisesList.find(e => e.id === ex.exercise_id)?.name || 'упражнение';
+                return `<div>${escapeHtml(exName)} — ${ex.sets}×${ex.reps} (${ex.weight} кг) <button type="button" onclick="removeExercise(${idx})">Удалить</button></div>`;
+            }).join('');
+        }
+
+        function removeExercise(idx) { selected.splice(idx,1); renderSelected(); }
+
+        document.getElementById('addExerciseBtn').onclick = () => {
+            const id = parseInt(document.getElementById('exerciseSelect').value);
+            const name = document.getElementById('exerciseSelect').selectedOptions[0].text;
+            addExercise(id, name);
+        };
+
+        document.getElementById('workoutForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('workoutName').value;
+            if (!name) { alert('Введите название'); return; }
+            if (selected.length === 0) { alert('Добавьте упражнения'); return; }
+            try {
+                const result = await fetch('/api/workouts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                    body: JSON.stringify({ name, exercises: selected })
+                });
+                if (!result.ok) throw new Error(await result.text());
+                alert('Тренировка создана!');
+                window.location.href = 'my_workouts.html';
+            } catch (err) { alert('Ошибка: ' + err.message); }
+        };
+
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+        loadExercises();
+    </script>
+</body>
+</html>
