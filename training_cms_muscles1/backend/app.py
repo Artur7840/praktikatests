@@ -7,7 +7,6 @@ def create_app():
     app = Flask(__name__, static_folder='../frontend', static_url_path='')
     app.config.from_object(Config)
     JWTManager(app)
-
     app.teardown_appcontext(close_db)
 
     from backend.auth import register, login
@@ -16,6 +15,7 @@ def create_app():
         create_workout, get_my_workouts, get_workout, log_set, delete_workout
     )
 
+    # API маршруты
     app.add_url_rule('/api/register', view_func=register, methods=['POST'])
     app.add_url_rule('/api/login', view_func=login, methods=['POST'])
     app.add_url_rule('/api/muscle-groups', view_func=get_muscle_groups, methods=['GET'])
@@ -27,21 +27,19 @@ def create_app():
     app.add_url_rule('/api/workout-exercises/<int:workout_exercise_id>/log', view_func=log_set, methods=['POST'])
     app.add_url_rule('/api/workouts/<int:workout_id>', view_func=delete_workout, methods=['DELETE'])
 
+    # Маршруты для статических файлов фронтенда
     @app.route('/')
     def index():
         return send_from_directory('../frontend', 'index.html')
-    
+
     @app.route('/<path:path>')
     def static_files(path):
         return send_from_directory('../frontend', path)
 
-    # Временный эндпоинт для заполнения БД (удалить после использования)
-
-
     return app
 
+# Глобальный объект приложения для Gunicorn
 app = create_app()
 
 if __name__ == '__main__':
-    app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)
