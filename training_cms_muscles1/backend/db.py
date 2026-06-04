@@ -2,7 +2,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import g
 from backend.config import Config
-import os
 
 def get_db():
     if 'db' not in g:
