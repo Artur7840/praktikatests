@@ -27,4 +27,9 @@ def execute(sql, params=None):
     cur = get_db().cursor()
     cur.execute(sql, params)
     get_db().commit()
-    return cur.lastrowid
+    # Если запрос содержит RETURNING, пытаемся получить результат
+    if 'RETURNING' in sql.upper():
+        row = cur.fetchone()
+        return row[0] if row else None
+    else:
+        return cur.rowcount
