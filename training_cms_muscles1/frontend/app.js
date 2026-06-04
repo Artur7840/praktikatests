@@ -58,4 +58,9 @@ function updateAuthButton() {
         authContainer.innerHTML = '<a href="login.html" style="color:white; text-decoration:none;">Войти</a>';
     }
 }
+// Функция для принудительного выхода
+function logout() {
+    localStorage.removeItem('access_token');
+    window.location.reload(); // или перенаправьте на главную
+}
 document.addEventListener('DOMContentLoaded', updateAuthButton);
