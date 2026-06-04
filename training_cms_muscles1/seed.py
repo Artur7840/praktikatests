@@ -1,15 +1,13 @@
 import os
-import sys
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash
 
-# Добавляем путь к корню проекта (чтобы найти schema.sql и config)
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Получаем URL базы данных
+# Получаем URL базы данных из переменной окружения
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
+    # Если переменной нет, возможно, проект запущен не на Render
+    # Здесь можно добавить fallback для локальной разработки, если нужно
     try:
         from backend.config import Config
         DATABASE_URL = Config.DATABASE_URL
@@ -20,24 +18,50 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL не задан. Установите переменную окружения.")
 
 def get_conn():
+    """Возвращает соединение с базой данных."""
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-def init_db():
-    """Создаёт таблицы из schema.sql (если их нет)"""
+def setup_database():
+    """Создаёт таблицы, если они не существуют."""
     conn = get_conn()
     with conn.cursor() as cur:
-        schema_path = os.path.join(os.path.dirname(__file__), '..', 'schema.sql')
-        if not os.path.exists(schema_path):
-            print("⚠️ schema.sql не найден, пропускаем создание таблиц")
-            return
-        with open(schema_path, 'r', encoding='utf-8') as f:
-            sql = f.read()
-            cur.execute(sql)
+        # Создаём таблицу групп мышц
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS muscle_group (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                description TEXT,
+                photo_url TEXT
+            )
+        """)
+        # Создаём таблицу упражнений
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS exercise (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                technique TEXT,
+                difficulty TEXT DEFAULT 'medium',
+                photo_url TEXT,
+                muscle_group_id INTEGER REFERENCES muscle_group(id)
+            )
+        """)
+        # Создаём таблицу пользователей
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS "user" (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT DEFAULT 'student'
+            )
+        """)
+        # ... здесь можно добавить создание других таблиц (тренировки, логи), если они нужны
         conn.commit()
     conn.close()
-    print("✅ Таблицы созданы/проверены")
+    print("✅ Таблицы успешно созданы (если их не было).")
 
 def seed_muscle_groups(cur):
+    """Заполняет таблицу групп мышц."""
     groups = [
         ('Грудные', 'Упражнения для развития грудных мышц', 'https://picsum.photos/id/100/400/300'),
         ('Спина', 'Тренировка широчайших и трапеций', 'https://picsum.photos/id/101/400/300'),
@@ -57,6 +81,7 @@ def seed_muscle_groups(cur):
     print(f"  ➕ Группы мышц: добавлено/проверено {len(groups)}")
 
 def seed_exercises(cur):
+    """Заполняет таблицу упражнений."""
     exercises = [
         # Грудные (muscle_group_id = 1)
         ('Жим штанги лёжа', 'Базовое упражнение для массы груди', 'Лягте на скамью, гриф на уровне глаз. Опускайте до груди, выжимайте вверх.', 'medium', 'https://picsum.photos/id/1/400/300', 1),
@@ -109,7 +134,6 @@ def seed_exercises(cur):
         ('Махи ногой в кроссовере', 'Изоляция ягодиц', 'Стойка лицом к блоку, мах прямой ногой назад.', 'medium', 'https://picsum.photos/id/41/400/300', 8),
     ]
     for ex in exercises:
-        # Проверка на существование
         cur.execute("SELECT id FROM exercise WHERE name = %s AND muscle_group_id = %s", (ex[0], ex[5]))
         if cur.fetchone() is None:
             cur.execute("""
@@ -119,6 +143,7 @@ def seed_exercises(cur):
     print(f"  ➕ Упражнения: добавлено/проверено {len(exercises)}")
 
 def seed_user(cur):
+    """Добавляет тестового пользователя."""
     email = 'student@example.com'
     password = 'student'
     hashed = generate_password_hash(password)
@@ -131,7 +156,7 @@ def seed_user(cur):
 
 def main():
     print("🌱 Запуск seed.py для PostgreSQL...")
-    init_db()
+    setup_database()
     conn = get_conn()
     cur = conn.cursor()
     seed_muscle_groups(cur)
