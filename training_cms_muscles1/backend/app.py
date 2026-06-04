@@ -35,6 +35,16 @@ def create_app():
     def static_files(path):
         return send_from_directory('../frontend', path)
 
+    # Временный эндпоинт для заполнения БД (удалить после использования)
+@app.route('/debug/seed', methods=['GET'])
+def seed_database():
+    try:
+        import subprocess
+        result = subprocess.run(['python', 'backend/seed.py'], capture_output=True, text=True)
+        return f"<pre>STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}</pre>"
+    except Exception as e:
+        return str(e), 500
+
     return app
 
 app = create_app()
