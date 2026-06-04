@@ -74,7 +74,6 @@ def get_workout(workout_id):
 @jwt_required()
 def log_set(workout_exercise_id):
     user_id = int(get_jwt_identity())
-    # Проверка, что эта связь принадлежит тренировке текущего пользователя
     we = query_one('''
         SELECT we.id FROM workout_exercise we
         JOIN workout w ON we.workout_id = w.id
