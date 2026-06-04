@@ -23,7 +23,7 @@ groups = [
     ('Ягодицы', 'Укрепление ягодичных', 'https://picsum.photos/id/107/400/300'),
 ]
 for name, desc, url in groups:
-    cursor.execute('INSERT OR IGNORE INTO muscle_group (name, description, photo_url) VALUES (?, ?, ?)', (name, desc, url))
+    cursor.execute('INSERT OR IGNORE INTO muscle_group (name, description, photo_url) VALUES (%s, %s, %s)', (name, desc, url))
 
 exercises = [
     # Грудные (1)
@@ -78,10 +78,10 @@ exercises = [
 ]
 for name, desc, tech, diff, img, mg_id in exercises:
     cursor.execute('''INSERT OR IGNORE INTO exercise (name, description, technique, difficulty, photo_url, muscle_group_id)
-                      VALUES (?, ?, ?, ?, ?, ?)''', (name, desc, tech, diff, img, mg_id))
+                      VALUES (%s, %s, %s, %s, %s, %s)''', (name, desc, tech, diff, img, mg_id))
 
 hashed = generate_password_hash('student')
-cursor.execute('INSERT OR IGNORE INTO user (email, password, role) VALUES (?, ?, ?)',
+cursor.execute('INSERT OR IGNORE INTO user (email, password, role) VALUES (%s, %s, %s)',
                ('student@example.com', hashed, 'student'))
 
 conn.commit()
