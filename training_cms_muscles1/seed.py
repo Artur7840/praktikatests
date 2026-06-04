@@ -22,40 +22,38 @@ def get_conn():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def setup_database():
-    """Создаёт таблицы, если они не существуют."""
     conn = get_conn()
     with conn.cursor() as cur:
-        # Создаём таблицу групп мышц
+        # ... существующие таблицы muscle_group, exercise, "user" ...
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS muscle_group (
-                id SERIAL PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                description TEXT,
-                photo_url TEXT
-            )
-        """)
-        # Создаём таблицу упражнений
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS exercise (
+            CREATE TABLE IF NOT EXISTS workout (
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
-                description TEXT,
-                technique TEXT,
-                difficulty TEXT DEFAULT 'medium',
-                photo_url TEXT,
-                muscle_group_id INTEGER REFERENCES muscle_group(id)
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE
             )
         """)
-        # Создаём таблицу пользователей
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS "user" (
+            CREATE TABLE IF NOT EXISTS workout_exercise (
                 id SERIAL PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                role TEXT DEFAULT 'student'
+                workout_id INTEGER NOT NULL REFERENCES workout(id) ON DELETE CASCADE,
+                exercise_id INTEGER NOT NULL REFERENCES exercise(id) ON DELETE CASCADE,
+                sets INTEGER DEFAULT 3,
+                reps INTEGER DEFAULT 10,
+                weight REAL,
+                "order" INTEGER DEFAULT 0
             )
         """)
-        # ... здесь можно добавить создание других таблиц (тренировки, логи), если они нужны
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS workout_log (
+                id SERIAL PRIMARY KEY,
+                workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercise(id) ON DELETE CASCADE,
+                set_number INTEGER,
+                reps_done INTEGER,
+                weight_used REAL,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.commit()
     conn.close()
     print("✅ Таблицы успешно созданы (если их не было).")
