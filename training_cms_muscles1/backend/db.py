@@ -27,9 +27,14 @@ def execute(sql, params=None):
     cur = get_db().cursor()
     cur.execute(sql, params)
     get_db().commit()
-    # Если запрос содержит RETURNING, пытаемся получить результат
     if 'RETURNING' in sql.upper():
         row = cur.fetchone()
-        return row[0] if row else None
+        if row:
+            # Если используется RealDictCursor, берём первое значение словаря
+            if isinstance(row, dict):
+                return list(row.values())[0]
+            else:
+                return row[0]
+        return None
     else:
         return cur.rowcount
