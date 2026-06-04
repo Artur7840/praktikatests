@@ -9,18 +9,18 @@ def register():
     password = data.get('password')
     if not email or not password:
         return jsonify({'msg': 'Email and password required'}), 400
-    existing = query_one('SELECT id FROM user WHERE email = %s', (email,))
+    existing = query_one('SELECT id FROM "user" WHERE email = %s', (email,))
     if existing:
         return jsonify({'msg': 'User already exists'}), 409
     hashed = generate_password_hash(password)
-    execute('INSERT INTO user (email, password) VALUES (%s, %s)', (email, hashed))
+    execute('INSERT INTO "user" (email, password) VALUES (%s, %s)', (email, hashed))
     return jsonify({'msg': 'User created successfully'}), 201
 
 def login():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
-    user = query_one('SELECT id, password FROM user WHERE email = %s', (email,))
+    user = query_one('SELECT id, password FROM "user" WHERE email = %s', (email,))
     if not user or not check_password_hash(user['password'], password):
         return jsonify({'msg': 'Invalid credentials'}), 401
     access_token = create_access_token(identity=str(user['id']))
