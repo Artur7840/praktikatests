@@ -27,29 +27,72 @@
         }
 
         async function loadWorkout() {
-            const w = await fetchJson(`/api/workouts/${workoutId}`);
-            let html = `<h2>${escapeHtml(w.name)}</h2>`;
-            for (let ex of w.exercises) {
-                html += `<div class="workout-item"><h3>${escapeHtml(ex.name)}</h3><img src="${ex.photo_url}" style="width:100px"><br>`;
-                for (let s=1; s<=ex.sets; s++) {
-                    html += `<p>Подход ${s}: <input type="number" id="reps_${ex.id}_${s}" placeholder="повторы"> 
-                             <input type="number" id="weight_${ex.id}_${s}" placeholder="вес" step="0.5"> 
-                             <button onclick="logSet(${ex.id}, ${s})">Записать</button></p>`;
+            try {
+                const w = await fetchJson(`/api/workouts/${workoutId}`);
+                if (!w || !w.exercises || w.exercises.length === 0) {
+                    document.getElementById('workoutContent').innerHTML = '<p>В этой тренировке нет упражнений.</p>';
+                    return;
                 }
-                html += `</div>`;
+                let html = `<h2>${escapeHtml(w.name)}</h2>`;
+                for (let ex of w.exercises) {
+                    html += `
+                        <div class="workout-item">
+                            <h3>${escapeHtml(ex.name)}</h3>
+                            <img src="${ex.photo_url || 'https://via.placeholder.com/100'}" style="width:100px; border-radius:8px;">
+                            <p>Подходы: ${ex.sets}, Повторения: ${ex.reps}, Вес: ${ex.weight || 0} кг</p>
+                    `;
+                    for (let s = 1; s <= ex.sets; s++) {
+                        html += `
+                            <div style="margin-top: 10px;">
+                                Подход ${s}: 
+                                <input type="number" id="reps_${ex.id}_${s}" placeholder="повторы" style="width:80px;"> 
+                                <input type="number" id="weight_${ex.id}_${s}" placeholder="вес" step="0.5" style="width:80px;"> 
+                                <button onclick="logSet(${ex.id}, ${s})">Записать</button>
+                            </div>
+                        `;
+                    }
+                    html += `</div><hr>`;
+                }
+                document.getElementById('workoutContent').innerHTML = html;
+            } catch (err) {
+                document.getElementById('workoutContent').innerHTML = `<p>Ошибка загрузки тренировки: ${err.message}</p>`;
             }
-            document.getElementById('workoutContent').innerHTML = html;
         }
+
         async function logSet(workoutExerciseId, setNumber) {
-            const reps = document.getElementById(`reps_${workoutExerciseId}_${setNumber}`).value;
-            const weight = document.getElementById(`weight_${workoutExerciseId}_${setNumber}`).value;
-            await fetchJson(`/api/workout-exercises/${workoutExerciseId}/log`, {
-                method: 'POST',
-                body: JSON.stringify({ set_number: setNumber, reps_done: parseInt(reps), weight_used: parseFloat(weight) })
-            });
-            alert('Подход записан');
+            const repsInput = document.getElementById(`reps_${workoutExerciseId}_${setNumber}`);
+            const weightInput = document.getElementById(`weight_${workoutExerciseId}_${setNumber}`);
+            if (!repsInput.value || !weightInput.value) {
+                alert('Заполните повторения и вес');
+                return;
+            }
+            try {
+                await fetchJson(`/api/workout-exercises/${workoutExerciseId}/log`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        set_number: setNumber,
+                        reps_done: parseInt(repsInput.value),
+                        weight_used: parseFloat(weightInput.value)
+                    })
+                });
+                alert('Подход записан');
+                repsInput.value = '';
+                weightInput.value = '';
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
+            }
         }
-        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+        function escapeHtml(str) { 
+            if (!str) return ''; 
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
         loadWorkout();
     </script>
 </body>
