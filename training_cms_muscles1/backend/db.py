@@ -30,7 +30,6 @@ def execute(sql, params=None):
     if 'RETURNING' in sql.upper():
         row = cur.fetchone()
         if row:
-            # Если используется RealDictCursor, берём первое значение словаря
             if isinstance(row, dict):
                 return list(row.values())[0]
             else:
