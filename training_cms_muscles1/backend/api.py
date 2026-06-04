@@ -30,7 +30,7 @@ def create_workout():
         return jsonify({'msg': 'Workout name required'}), 400
     if not exercises:
         return jsonify({'msg': 'At least one exercise required'}), 400
-    workout_id = execute('INSERT INTO workout (name, user_id) VALUES (%s, %s)', (name, user_id))
+    workout_id = execute('INSERT INTO workout (name, user_id) VALUES (%s, %s) RETURNING id', (name, user_id))
     for idx, ex in enumerate(exercises):
         execute('''INSERT INTO workout_exercise (workout_id, exercise_id, sets, reps, weight, "order")
                    VALUES (%s, %s, %s, %s, %s, %s)''',
