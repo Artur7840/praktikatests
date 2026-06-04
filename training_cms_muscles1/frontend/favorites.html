@@ -4,6 +4,34 @@
     <meta charset="UTF-8">
     <title>Избранные упражнения</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Принудительная сетка для избранного */
+        #favoritesContainer.cards-grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 1.8rem !important;
+        }
+        @media (max-width: 1200px) {
+            #favoritesContainer.cards-grid {
+                grid-template-columns: repeat(3, 1fr) !important;
+            }
+        }
+        @media (max-width: 900px) {
+            #favoritesContainer.cards-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+        }
+        @media (max-width: 600px) {
+            #favoritesContainer.cards-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+        /* Гарантия, что карточки не растягиваются на всю ширину */
+        .exercise-card {
+            width: auto !important;
+            max-width: 100%;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -47,6 +75,8 @@
                     </div>
                 </div>
             `).join('');
+            // Повторно убеждаемся, что класс cards-grid есть (на всякий случай)
+            container.classList.add('cards-grid');
         }
         async function removeFromFav(exId) {
             removeFavorite(exId);
