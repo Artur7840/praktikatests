@@ -37,32 +37,36 @@ def get_muscle_groups():
 
 # ---------- Exercises ----------
 def get_exercises():
-    muscle_id = request.args.get('muscle', type=int)
-    type_filter = request.args.get('type', type=str)
-    
-    if USE_ORM:
-        db = next(get_orm_db())
-        exercises = crud_orm.get_exercises(db, muscle_id, type_filter)
-        return jsonify([{
-            'id': ex.id,
-            'name': ex.name,
-            'description': ex.description,
-            'difficulty': ex.difficulty,
-            'photo_url': ex.photo_url,
-            'muscle_group_id': ex.muscle_group_id,
-            'type': ex.type
-        } for ex in exercises])
-    else:
-        sql = 'SELECT id, name, difficulty, photo_url, muscle_group_id, description FROM exercise WHERE is_deleted = false'
-        params = []
-        if muscle_id:
-            sql += ' AND muscle_group_id = %s'
-            params.append(muscle_id)
-        if type_filter:
-            sql += ' AND type = %s'
-            params.append(type_filter)
-        rows = query_all(sql, tuple(params))
-        return jsonify([dict(row) for row in rows])
+    try:
+        muscle_id = request.args.get('muscle', type=int)
+        type_filter = request.args.get('type', type=str)
+        
+        if USE_ORM:
+            db = next(get_orm_db())
+            exercises = crud_orm.get_exercises(db, muscle_id, type_filter)
+            return jsonify([{
+                'id': ex.id,
+                'name': ex.name,
+                'description': ex.description,
+                'difficulty': ex.difficulty,
+                'photo_url': ex.photo_url,
+                'muscle_group_id': ex.muscle_group_id,
+                'type': ex.type
+            } for ex in exercises])
+        else:
+            sql = 'SELECT id, name, difficulty, photo_url, muscle_group_id, description FROM exercise WHERE is_deleted = false'
+            params = []
+            if muscle_id:
+                sql += ' AND muscle_group_id = %s'
+                params.append(muscle_id)
+            if type_filter:
+                sql += ' AND type = %s'
+                params.append(type_filter)
+            rows = query_all(sql, tuple(params))
+            return jsonify([dict(row) for row in rows])
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 def get_exercise(exercise_id):
     version = request.args.get('version', type=int)
