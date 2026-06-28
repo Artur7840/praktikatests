@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import os
 
 # Переключение между ORM и Native SQL
-USE_ORM = os.environ.get('USE_ORM', 'True').lower() == 'true'
+USE_ORM = False
 
 # Импорты для ORM
 from backend.database import get_db as get_orm_db
