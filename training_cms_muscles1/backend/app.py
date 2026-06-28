@@ -38,6 +38,25 @@ def create_app():
     app.add_url_rule('/api/favorites', view_func=get_favorites, methods=['GET'])
 
     # Маршруты для статики
+    @app.route('/debug/add_parent_id', methods=['GET'])
+    def add_parent_id():
+        try:
+            from backend.db import get_db
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='muscle_group' AND column_name='parent_id'
+            """)
+            if cur.fetchone():
+                return "✅ Столбец parent_id уже существует"
+            cur.execute("ALTER TABLE muscle_group ADD COLUMN parent_id INTEGER REFERENCES muscle_group(id)")
+            conn.commit()
+            return "✅ Столбец parent_id успешно добавлен"
+        except Exception as e:
+            return f"❌ Ошибка: {e}"
+
     @app.route('/')
     def index():
         return send_from_directory('../frontend', 'index.html')
@@ -46,45 +65,8 @@ def create_app():
     def static_files(path):
         return send_from_directory('../frontend', path)
 
-    @app.route('/debug/add_parent_id', methods=['GET'])
-def add_parent_id():
-    try:
-        from backend.db import get_db
-        conn = get_db()
-        cur = conn.cursor()
-        # Проверяем, существует ли столбец
-        cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name='muscle_group' AND column_name='parent_id'
-        """)
-        if cur.fetchone():
-            return "✅ Столбец parent_id уже существует"
-        # Добавляем столбец
-        cur.execute("ALTER TABLE muscle_group ADD COLUMN parent_id INTEGER REFERENCES muscle_group(id)")
-        conn.commit()
-        return "✅ Столбец parent_id успешно добавлен"
-    except Exception as e:
-        return f"❌ Ошибка: {e}"
-
-        # Диагностический эндпоинт для проверки количества упражнений в БД
-    @app.route('/debug/count', methods=['GET'])
-    def debug_count():
-        try:
-            if USE_ORM:
-                from backend.database import get_db as get_orm_db
-                from backend import models
-                db = next(get_orm_db())
-                count = db.query(models.Exercise).count()
-                return jsonify({'count': count, 'mode': 'ORM'})
-            else:
-                from backend.db import query_one
-                row = query_one('SELECT COUNT(*) FROM exercise')
-                return jsonify({'count': row[0] if row else 0, 'mode': 'Native SQL'})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
     return app
+
 
 app = create_app()
 
