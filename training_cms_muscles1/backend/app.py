@@ -46,6 +46,23 @@ def create_app():
     def static_files(path):
         return send_from_directory('../frontend', path)
 
+        # Диагностический эндпоинт для проверки количества упражнений в БД
+    @app.route('/debug/count', methods=['GET'])
+    def debug_count():
+        try:
+            if USE_ORM:
+                from backend.database import get_db as get_orm_db
+                from backend import models
+                db = next(get_orm_db())
+                count = db.query(models.Exercise).count()
+                return jsonify({'count': count, 'mode': 'ORM'})
+            else:
+                from backend.db import query_one
+                row = query_one('SELECT COUNT(*) FROM exercise')
+                return jsonify({'count': row[0] if row else 0, 'mode': 'Native SQL'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
     return app
 
 app = create_app()
