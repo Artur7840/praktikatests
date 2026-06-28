@@ -23,16 +23,117 @@ def get_conn():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def setup_database():
-    """Создаёт таблицы из schema.sql."""
+    """Создаёт таблицы из schema.sql, если они не существуют."""
     conn = get_conn()
     with conn.cursor() as cur:
         schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
-        with open(schema_path, 'r', encoding='utf-8') as f:
-            sql = f.read()
-            cur.execute(sql)
-        conn.commit()
+        try:
+            with open(schema_path, 'r', encoding='utf-8') as f:
+                sql = f.read()
+                cur.execute(sql)
+            conn.commit()
+            print("✅ Таблицы успешно созданы (если их не было).")
+        except FileNotFoundError:
+            print("⚠️ schema.sql не найден, пропускаем создание таблиц.")
+        except Exception as e:
+            print(f"⚠️ Ошибка при создании таблиц: {e}")
     conn.close()
-    print("✅ Таблицы успешно созданы (если их не было).")
+
+def migrate_schema(cur):
+    """Добавляет недостающие столбцы для совместимости с ORM."""
+    print("🔄 Проверка и обновление схемы...")
+    
+    # Список колонок для таблицы muscle_group
+    columns_muscle_group = [
+        ("parent_id", "INTEGER REFERENCES muscle_group(id)")
+    ]
+    for col, col_type in columns_muscle_group:
+        cur.execute(f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='muscle_group' AND column_name='{col}') THEN
+                    ALTER TABLE muscle_group ADD COLUMN {col} {col_type};
+                END IF;
+            END $$;
+        """)
+    
+    # Список колонок для таблицы exercise
+    columns_exercise = [
+        ("type", "VARCHAR(20) DEFAULT 'strength'"),
+        ("default_sets", "INTEGER"),
+        ("default_reps", "INTEGER"),
+        ("default_weight", "REAL"),
+        ("default_duration_min", "INTEGER"),
+        ("default_distance_km", "REAL"),
+        ("default_calories", "INTEGER"),
+        ("default_duration_sec", "INTEGER"),
+        ("current_version_id", "INTEGER"),
+        ("is_deleted", "BOOLEAN DEFAULT FALSE"),
+        ("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    ]
+    for col, col_type in columns_exercise:
+        cur.execute(f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='exercise' AND column_name='{col}') THEN
+                    ALTER TABLE exercise ADD COLUMN {col} {col_type};
+                END IF;
+            END $$;
+        """)
+    
+    # Список колонок для таблицы user
+    columns_user = [
+        ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    ]
+    for col, col_type in columns_user:
+        cur.execute(f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='user' AND column_name='{col}') THEN
+                    ALTER TABLE \"user\" ADD COLUMN {col} {col_type};
+                END IF;
+            END $$;
+        """)
+    
+    # Проверяем наличие таблицы exercise_version
+    cur.execute("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name = 'exercise_version'
+        );
+    """)
+    if not cur.fetchone()['exists']:
+        # Если таблицы нет, создаём её (можно взять из schema.sql, но упростим)
+        cur.execute("""
+            CREATE TABLE exercise_version (
+                id SERIAL PRIMARY KEY,
+                exercise_id INTEGER NOT NULL REFERENCES exercise(id) ON DELETE CASCADE,
+                version_number INTEGER NOT NULL,
+                valid_from TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                name TEXT NOT NULL,
+                description TEXT,
+                technique TEXT,
+                difficulty TEXT DEFAULT 'medium',
+                photo_url TEXT,
+                muscle_group_id INTEGER NOT NULL,
+                type VARCHAR(20) DEFAULT 'strength',
+                default_sets INTEGER,
+                default_reps INTEGER,
+                default_weight REAL,
+                default_duration_min INTEGER,
+                default_distance_km REAL,
+                default_calories INTEGER,
+                default_duration_sec INTEGER,
+                is_current BOOLEAN DEFAULT FALSE,
+                UNIQUE(exercise_id, version_number)
+            );
+        """)
+        print("  ➕ Создана таблица exercise_version")
+    
+    print("✅ Схема успешно обновлена.")
 
 def seed_muscle_groups(cur):
     groups = [
@@ -131,9 +232,14 @@ def seed_user(cur):
 
 def main():
     print("🌱 Запуск seed.py для PostgreSQL...")
+    # Создаём таблицы (если их нет) по schema.sql
     setup_database()
+    # Подключаемся и обновляем схему (добавляем недостающие колонки)
     conn = get_conn()
     cur = conn.cursor()
+    migrate_schema(cur)
+    conn.commit()
+    # Заполняем данными
     seed_muscle_groups(cur)
     seed_exercises(cur)
     seed_user(cur)
