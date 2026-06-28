@@ -25,6 +25,7 @@ def create_app():
     app.add_url_rule('/api/login', view_func=login, methods=['POST'])
     app.add_url_rule('/api/muscle-groups', view_func=get_muscle_groups, methods=['GET'])
     app.add_url_rule('/api/exercises', view_func=get_exercises, methods=['GET'])
+    app.add_url_rule('/api/exercises', view_func=create_exercise, methods=['POST'])
     app.add_url_rule('/api/exercises/<int:exercise_id>', view_func=get_exercise, methods=['GET'])
     app.add_url_rule('/api/exercises/<int:exercise_id>/versions', view_func=get_exercise_versions, methods=['GET'])
     app.add_url_rule('/api/exercises/versions/<int:version_id>', view_func=get_version_by_id, methods=['GET'])
