@@ -15,7 +15,7 @@ def create_app():
         create_workout, get_my_workouts, get_workout, log_set, delete_workout
     )
 
-    # API маршруты
+    # API маршруты (исправлены: добавлены угловые скобки для параметров)
     app.add_url_rule('/api/register', view_func=register, methods=['POST'])
     app.add_url_rule('/api/login', view_func=login, methods=['POST'])
     app.add_url_rule('/api/muscle-groups', view_func=get_muscle_groups, methods=['GET'])
