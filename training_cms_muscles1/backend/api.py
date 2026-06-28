@@ -1,23 +1,18 @@
+import os
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-import os
 
 # Переключение между ORM и Native SQL
-USE_ORM = False
+USE_ORM = os.environ.get('USE_ORM', 'False').lower() == 'true'
 
-# Импорты для ORM
-from backend.database import get_db as get_orm_db
-from backend import crud_orm
+# Импорты для ORM (если используется)
+if USE_ORM:
+    from backend.database import get_db as get_orm_db
+    from backend import crud_orm
+    from backend import schemas
 
-# Импорты для Native SQL
+# Импорты для Native SQL (всегда нужны)
 from backend.db import query_one, query_all, execute
-
-def get_crud():
-    if USE_ORM:
-        return crud_orm
-    else:
-        # Для Native SQL используем функции из db.py и отдельные обёртки
-        return None  # будет использоваться напрямую
 
 # ---------- Muscle Groups ----------
 def get_muscle_groups():
@@ -35,38 +30,34 @@ def get_muscle_groups():
         rows = query_all('SELECT id, name, photo_url FROM muscle_group WHERE parent_id IS NULL')
         return jsonify([dict(row) for row in rows])
 
-# ---------- Exercises ----------
+# ---------- Exercises CRUD ----------
 def get_exercises():
-    try:
-        muscle_id = request.args.get('muscle', type=int)
-        type_filter = request.args.get('type', type=str)
-        
-        if USE_ORM:
-            db = next(get_orm_db())
-            exercises = crud_orm.get_exercises(db, muscle_id, type_filter)
-            return jsonify([{
-                'id': ex.id,
-                'name': ex.name,
-                'description': ex.description,
-                'difficulty': ex.difficulty,
-                'photo_url': ex.photo_url,
-                'muscle_group_id': ex.muscle_group_id,
-                'type': ex.type
-            } for ex in exercises])
-        else:
-            sql = 'SELECT id, name, difficulty, photo_url, muscle_group_id, description FROM exercise WHERE is_deleted = false'
-            params = []
-            if muscle_id:
-                sql += ' AND muscle_group_id = %s'
-                params.append(muscle_id)
-            if type_filter:
-                sql += ' AND type = %s'
-                params.append(type_filter)
-            rows = query_all(sql, tuple(params))
-            return jsonify([dict(row) for row in rows])
-    except Exception as e:
-        import traceback
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+    muscle_id = request.args.get('muscle', type=int)
+    type_filter = request.args.get('type', type=str)
+    
+    if USE_ORM:
+        db = next(get_orm_db())
+        exercises = crud_orm.get_exercises(db, muscle_id, type_filter)
+        return jsonify([{
+            'id': ex.id,
+            'name': ex.name,
+            'description': ex.description,
+            'difficulty': ex.difficulty,
+            'photo_url': ex.photo_url,
+            'muscle_group_id': ex.muscle_group_id,
+            'type': ex.type
+        } for ex in exercises])
+    else:
+        sql = 'SELECT id, name, difficulty, photo_url, muscle_group_id, description FROM exercise WHERE is_deleted = false'
+        params = []
+        if muscle_id:
+            sql += ' AND muscle_group_id = %s'
+            params.append(muscle_id)
+        if type_filter:
+            sql += ' AND type = %s'
+            params.append(type_filter)
+        rows = query_all(sql, tuple(params))
+        return jsonify([dict(row) for row in rows])
 
 def get_exercise(exercise_id):
     version = request.args.get('version', type=int)
@@ -93,14 +84,119 @@ def get_exercise(exercise_id):
                 'type': ex.type,
                 'default_sets': ex.default_sets,
                 'default_reps': ex.default_reps,
-                'default_weight': ex.default_weight
+                'default_weight': ex.default_weight,
+                'default_duration_min': ex.default_duration_min,
+                'default_distance_km': ex.default_distance_km,
+                'default_calories': ex.default_calories,
+                'default_duration_sec': ex.default_duration_sec
             })
     else:
-        sql = 'SELECT id, name, description, technique, difficulty, photo_url, muscle_group_id FROM exercise WHERE id = %s AND is_deleted = false'
+        sql = 'SELECT id, name, description, technique, difficulty, photo_url, muscle_group_id, type, default_sets, default_reps, default_weight, default_duration_min, default_distance_km, default_calories, default_duration_sec FROM exercise WHERE id = %s AND is_deleted = false'
         row = query_one(sql, (exercise_id,))
         if not row:
             return jsonify({'msg': 'Not found'}), 404
         return jsonify(dict(row))
+
+def create_exercise():
+    """Создание нового упражнения (POST /api/exercises)"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'msg': 'No data provided'}), 400
+    
+    # Проверка обязательных полей
+    required = ['name', 'muscle_group_id', 'type']
+    for field in required:
+        if field not in data:
+            return jsonify({'msg': f'Missing required field: {field}'}), 400
+    
+    if USE_ORM:
+        db = next(get_orm_db())
+        # Создаём схему из данных
+        exercise_schema = schemas.ExerciseCreate(**data)
+        new_ex = crud_orm.create_exercise(db, exercise_schema)
+        return jsonify({'id': new_ex.id, 'msg': 'Exercise created'}), 201
+    else:
+        # Native SQL
+        # Извлекаем все поля
+        name = data['name']
+        description = data.get('description')
+        technique = data.get('technique')
+        difficulty = data.get('difficulty', 'medium')
+        photo_url = data.get('photo_url')
+        muscle_group_id = data['muscle_group_id']
+        type_ = data['type']
+        default_sets = data.get('default_sets')
+        default_reps = data.get('default_reps')
+        default_weight = data.get('default_weight')
+        default_duration_min = data.get('default_duration_min')
+        default_distance_km = data.get('default_distance_km')
+        default_calories = data.get('default_calories')
+        default_duration_sec = data.get('default_duration_sec')
+        
+        # Вставляем запись
+        sql = """
+            INSERT INTO exercise (
+                name, description, technique, difficulty, photo_url,
+                muscle_group_id, type,
+                default_sets, default_reps, default_weight,
+                default_duration_min, default_distance_km, default_calories, default_duration_sec
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """
+        params = (name, description, technique, difficulty, photo_url,
+                  muscle_group_id, type_,
+                  default_sets, default_reps, default_weight,
+                  default_duration_min, default_distance_km, default_calories, default_duration_sec)
+        new_id = execute(sql, params)
+        return jsonify({'id': new_id, 'msg': 'Exercise created'}), 201
+
+def update_exercise(exercise_id):
+    """Обновление упражнения (PUT /api/exercises/<id>)"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'msg': 'No data provided'}), 400
+    
+    if USE_ORM:
+        db = next(get_orm_db())
+        # Создаём схему обновления
+        update_schema = schemas.ExerciseUpdate(**data)
+        updated = crud_orm.update_exercise(db, exercise_id, update_schema)
+        if not updated:
+            return jsonify({'msg': 'Exercise not found'}), 404
+        return jsonify({'msg': 'Exercise updated'}), 200
+    else:
+        # Нативный SQL: динамическое обновление только переданных полей
+        fields = []
+        values = []
+        allowed_fields = ['name', 'description', 'technique', 'difficulty', 'photo_url',
+                          'muscle_group_id', 'type',
+                          'default_sets', 'default_reps', 'default_weight',
+                          'default_duration_min', 'default_distance_km', 'default_calories', 'default_duration_sec']
+        for key in allowed_fields:
+            if key in data:
+                fields.append(f"{key} = %s")
+                values.append(data[key])
+        if not fields:
+            return jsonify({'msg': 'No fields to update'}), 400
+        
+        values.append(exercise_id)
+        sql = f"UPDATE exercise SET {', '.join(fields)} WHERE id = %s AND is_deleted = false RETURNING id"
+        row = query_one(sql, tuple(values))
+        if not row:
+            return jsonify({'msg': 'Exercise not found'}), 404
+        return jsonify({'msg': 'Exercise updated'}), 200
+
+def delete_exercise(exercise_id):
+    """Логическое удаление упражнения (DELETE /api/exercises/<id>)"""
+    if USE_ORM:
+        db = next(get_orm_db())
+        success = crud_orm.delete_exercise(db, exercise_id)
+        if not success:
+            return jsonify({'msg': 'Exercise not found'}), 404
+        return jsonify({'msg': 'Exercise deleted'}), 200
+    else:
+        execute('UPDATE exercise SET is_deleted = true WHERE id = %s', (exercise_id,))
+        return jsonify({'msg': 'Exercise deleted'}), 200
 
 def get_exercise_versions(exercise_id):
     if USE_ORM:
@@ -124,7 +220,7 @@ def get_version_by_id(version_id):
             return jsonify({'msg': 'Version not found'}), 404
         return jsonify(dict(row))
 
-# ---------- Workouts ----------
+# ---------- Workouts (требуют JWT) ----------
 @jwt_required()
 def create_workout():
     user_id = int(get_jwt_identity())
@@ -249,12 +345,14 @@ def delete_workout(workout_id):
         execute('DELETE FROM workout WHERE id = %s', (workout_id,))
         return jsonify({'msg': 'Workout deleted'}), 200
 
-# ---------- Favorites ----------
+# ---------- Favorites (требуют JWT) ----------
 @jwt_required()
 def add_favorite():
     user_id = int(get_jwt_identity())
     data = request.get_json()
     exercise_id = data.get('exercise_id')
+    if not exercise_id:
+        return jsonify({'msg': 'exercise_id required'}), 400
     
     if USE_ORM:
         db = next(get_orm_db())
@@ -299,5 +397,3 @@ def get_favorites():
             WHERE f.user_id = %s
         ''', (user_id,))
         return jsonify([dict(row) for row in rows])
-
-
