@@ -65,6 +65,13 @@ def create_app():
     def static_files(path):
         return send_from_directory('../frontend', path)
 
+        @app.route('/debug/exercises', methods=['GET'])
+    def debug_exercises():
+        from backend.db import query_all
+        from flask import jsonify
+        rows = query_all('SELECT id, name, difficulty, photo_url, muscle_group_id FROM exercise LIMIT 5')
+        return jsonify([dict(row) for row in rows])
+
     return app
 
 
