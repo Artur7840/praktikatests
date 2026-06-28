@@ -46,6 +46,27 @@ def create_app():
     def static_files(path):
         return send_from_directory('../frontend', path)
 
+    @app.route('/debug/add_parent_id', methods=['GET'])
+def add_parent_id():
+    try:
+        from backend.db import get_db
+        conn = get_db()
+        cur = conn.cursor()
+        # Проверяем, существует ли столбец
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='muscle_group' AND column_name='parent_id'
+        """)
+        if cur.fetchone():
+            return "✅ Столбец parent_id уже существует"
+        # Добавляем столбец
+        cur.execute("ALTER TABLE muscle_group ADD COLUMN parent_id INTEGER REFERENCES muscle_group(id)")
+        conn.commit()
+        return "✅ Столбец parent_id успешно добавлен"
+    except Exception as e:
+        return f"❌ Ошибка: {e}"
+
         # Диагностический эндпоинт для проверки количества упражнений в БД
     @app.route('/debug/count', methods=['GET'])
     def debug_count():
