@@ -165,5 +165,37 @@ def main():
     conn.close()
     print("✅ База данных полностью заполнена!")
 
+def setup_database():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        # ... существующие таблицы ...
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS exercise_version (
+                id SERIAL PRIMARY KEY,
+                exercise_id INTEGER NOT NULL REFERENCES exercise(id) ON DELETE CASCADE,
+                version_number INTEGER NOT NULL,
+                valid_from TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                name TEXT NOT NULL,
+                description TEXT,
+                technique TEXT,
+                difficulty TEXT DEFAULT 'medium',
+                photo_url TEXT,
+                muscle_group_id INTEGER NOT NULL,
+                type VARCHAR(20) DEFAULT 'strength',
+                default_sets INTEGER,
+                default_reps INTEGER,
+                default_weight REAL,
+                default_duration_min INTEGER,
+                default_distance_km REAL,
+                default_calories INTEGER,
+                default_duration_sec INTEGER,
+                is_current BOOLEAN DEFAULT FALSE,
+                UNIQUE(exercise_id, version_number)
+            )
+        """)
+        conn.commit()
+    conn.close()
+    print("✅ Таблицы успешно созданы (если их не было).")
+
 if __name__ == '__main__':
     main()
