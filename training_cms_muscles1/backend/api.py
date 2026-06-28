@@ -295,3 +295,14 @@ def get_favorites():
             WHERE f.user_id = %s
         ''', (user_id,))
         return jsonify([dict(row) for row in rows])
+
+@app.route('/debug/count', methods=['GET'])
+def debug_count():
+    if USE_ORM:
+        from backend.database import get_db as get_orm_db
+        db = next(get_orm_db())
+        count = db.query(models.Exercise).count()
+        return jsonify({'count': count, 'mode': 'ORM'})
+    else:
+        row = query_one('SELECT COUNT(*) FROM exercise')
+        return jsonify({'count': row[0] if row else 0, 'mode': 'Native SQL'})
